@@ -1,0 +1,156 @@
+====================================================================
+HOW TO ADD MULTIPLE API KEYS FOR AUTOMATIC FAILOVER
+====================================================================
+
+Your app now supports multiple API keys! When one key hits its rate limit,
+it automatically tries the next key, preventing "demo mode" from appearing.
+
+====================================================================
+STEP 1: GET ADDITIONAL API KEYS
+====================================================================
+
+OPTION A: Get More Gemini API Keys (Free)
+------------------------------------------
+1. Go to: https://aistudio.google.com/app/apikey
+2. Sign in with a DIFFERENT Google account (or create a new one)
+3. Click "Create API Key"
+4. Copy the new key
+5. Repeat for as many keys as you want (each Google account gets free quota)
+
+OPTION B: Get More Groq API Keys (Free)
+----------------------------------------
+1. Go to: https://console.groq.com/keys
+2. Sign up with a DIFFERENT email account (or create a new one)
+3. Create a new API key
+4. Copy the key
+5. Repeat for as many keys as you want
+
+OPTION C: Upgrade to Paid Tiers
+--------------------------------
+- Gemini: Upgrade to paid tier at Google Cloud Console for higher limits
+- Groq: Upgrade to "Dev Tier" at https://console.groq.com/settings/billing
+
+====================================================================
+STEP 2: ADD KEYS TO YOUR .env FILE
+====================================================================
+
+Open: backend/.env
+
+You'll see this structure:
+--------------------------------
+# Primary Gemini API Key
+GEMINI_API_KEY=your_first_key_here
+
+# Backup Gemini API Keys
+GEMINI_API_KEY_2=
+GEMINI_API_KEY_3=
+
+# Primary Groq API Key
+GROQ_API_KEY=your_first_key_here
+
+# Backup Groq API Keys
+GROQ_API_KEY_2=
+GROQ_API_KEY_3=
+--------------------------------
+
+Add your new keys like this:
+--------------------------------
+GEMINI_API_KEY=your_gemini_key_here
+GEMINI_API_KEY_2=your_second_gemini_key  (from 2nd account)
+GEMINI_API_KEY_3=your_third_gemini_key  (from 3rd account)
+
+GROQ_API_KEY=your_groq_key_here
+GROQ_API_KEY_2=your_second_groq_key  (from 2nd account)
+GROQ_API_KEY_3=your_third_groq_key  (from 3rd account)
+--------------------------------
+
+You can add up to 9 keys for each service:
+- GEMINI_API_KEY_2 through GEMINI_API_KEY_9
+- GROQ_API_KEY_2 through GROQ_API_KEY_9
+
+====================================================================
+STEP 3: RESTART YOUR BACKEND SERVER
+====================================================================
+
+1. Stop the current backend server (Ctrl+C in terminal)
+2. Restart it:
+   cd backend
+   python main.py
+
+3. You should see:
+   "Loaded X Gemini API key(s)"
+   "Loaded Y Groq API key(s)"
+
+====================================================================
+HOW IT WORKS NOW
+====================================================================
+
+When you click "Analyze Video":
+
+1. Tries Gemini Key #1 → If rate limited ↓
+2. Tries Gemini Key #2 → If rate limited ↓
+3. Tries Gemini Key #3 → If all Gemini keys fail ↓
+4. Tries Groq Key #1 → If rate limited ↓
+5. Tries Groq Key #2 → If rate limited ↓
+6. Tries Groq Key #3 → If ALL keys fail ↓
+7. Falls back to demo mode (last resort)
+
+The system shows which key and model was used in the results!
+
+====================================================================
+TIPS FOR MAXIMIZING FREE QUOTAS
+====================================================================
+
+1. Use Multiple Google Accounts:
+   - Each account gets separate free quota
+   - Create 2-3 Gmail accounts for development
+
+2. Use Multiple Groq Accounts:
+   - Each account gets 100,000 tokens/day free
+   - Sign up with different email addresses
+
+3. Monitor Your Usage:
+   - Gemini: https://aistudio.google.com/app/quota
+   - Groq: https://console.groq.com/settings/usage
+
+4. Efficient Usage:
+   - The app already truncates transcripts to 12,000 chars
+   - This helps stay within token limits
+
+====================================================================
+TESTING YOUR SETUP
+====================================================================
+
+After adding keys and restarting the server:
+
+1. Open your browser to the frontend
+2. Paste a YouTube URL
+3. Click "Analyze"
+4. Watch the backend terminal - you'll see:
+   - Which key is being tried
+   - Which model is being used
+   - If a key fails and it moves to the next one
+
+Example output:
+--------------------------------
+Trying Gemini API key #1...
+  Trying Gemini key #1, model: gemini-2.0-flash
+    ✗ Quota exceeded for key #1, model gemini-2.0-flash. Trying next key...
+Gemini key #1 failed: ...
+
+Trying Gemini API key #2...
+  Trying Gemini key #2, model: gemini-2.0-flash
+  ✓ Successfully used Gemini key #2, model: gemini-2.0-flash
+--------------------------------
+
+====================================================================
+NEED MORE HELP?
+====================================================================
+
+If you need help:
+1. Check the backend terminal for detailed logs
+2. Look for "Loaded X Gemini/Groq API key(s)" on startup
+3. Each API call shows which key and model is being used
+4. The results show "model_used" field with the exact key number
+
+====================================================================
