@@ -25,7 +25,8 @@ function App() {
     setQuizResults({});
 
     try {
-      const response = await fetch('http://localhost:5000/analyze', {
+      const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
