@@ -21,55 +21,82 @@ def get_video_id(url: str) -> Optional[str]:
 def fetch_transcript(video_id: str, language: str = "en") -> Tuple[Optional[str], Optional[str]]:
     """
     Return (transcript_text, error_message).
-    Supports both the legacy and the new youtube_transcript_api APIs.
-    Language parameter: 'en' (English)
+    Uses direct YouTube page extraction (works better on cloud providers).
     """
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-
-        # ── new API (>=0.6): instantiate, then call .list() ──────────────────
-        if not hasattr(YouTubeTranscriptApi, "get_transcript"):
-            api = YouTubeTranscriptApi()
-            transcript_list = api.list(video_id)
-            
-            # Try to get the requested language, fall back to available options
-            try:
-                chosen = transcript_list.find_transcript([language])
-            except Exception:
-                # If requested language not available, try English
-                if language != "en":
-                    try:
-                        chosen = transcript_list.find_transcript(["en"])
-                    except Exception:
-                        # Fall back to first available
-                        chosen = next(iter(transcript_list))
-                else:
-                    chosen = next(iter(transcript_list))
-            snippets = chosen.fetch()
-        else:
-            # ── legacy API (< 0.6): class-level static method ────────────────
-            try:
-                snippets = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
-            except Exception:
-                if language != "en":
-                    snippets = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
-                else:
-                    raise
-
-        # Normalise: both dict-style and object-style snippets
-        def snippet_text(s):
-            if isinstance(s, dict):
-                return s.get("text", "")
-            return getattr(s, "text", "")
-
-        full_text = " ".join(snippet_text(s) for s in snippets).strip()
+        import requests
+        import json
+        import re
+        from xml.etree import ElementTree
+        
+        # Method: Extract transcript directly from YouTube page
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        }
+        
+        print(f"Fetching transcript from YouTube page...")
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        # Extract transcript data from page
+        if 'captionTracks' not in response.text:
+            return None, "No transcript available for this video. Try a different video with closed captions."
+        
+        # Parse caption tracks
+        match = re.search(r'"captionTracks":(\[.*?\])', response.text)
+        if not match:
+            return None, "Could not find transcript data on this video."
+        
+        caption_data = match.group(1)
+        captions = json.loads(caption_data)
+        
+        # Find the right language
+        transcript_url = None
+        for caption in captions:
+            lang_code = caption.get('languageCode', '')
+            if lang_code == language or (language == 'en' and lang_code.startswith('en')):
+                transcript_url = caption.get('baseUrl')
+                print(f"Found transcript in language: {lang_code}")
+                break
+        
+        # Fallback to first available if language not found
+        if not transcript_url and captions:
+            transcript_url = captions[0].get('baseUrl')
+            print(f"Using default language: {captions[0].get('languageCode')}")
+        
+        if not transcript_url:
+            return None, "No transcript URL found for this video."
+        
+        # Fetch the actual transcript XML
+        print("Downloading transcript...")
+        transcript_response = requests.get(transcript_url, headers=headers, timeout=15)
+        transcript_response.raise_for_status()
+        
+        # Parse XML transcript
+        root = ElementTree.fromstring(transcript_response.text)
+        
+        texts = []
+        for text_elem in root.findall('.//text'):
+            if text_elem.text:
+                texts.append(text_elem.text)
+        
+        full_text = " ".join(texts).strip()
+        
         if not full_text:
             return None, "Transcript is empty for this video."
-
+        
+        print(f"Successfully fetched transcript ({len(full_text)} characters)")
         return full_text, None
-
-    except Exception as exc:
-        return None, f"Could not fetch transcript: {exc}"
+        
+    except requests.exceptions.RequestException as e:
+        return None, f"Network error while fetching transcript: {str(e)}"
+    except json.JSONDecodeError as e:
+        return None, f"Error parsing transcript data: {str(e)}"
+    except Exception as e:
+        return None, f"Could not fetch transcript: {str(e)}"
 
 
 def get_available_languages(video_id: str) -> list:

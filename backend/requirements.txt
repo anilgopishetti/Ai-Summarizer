@@ -1,6 +1,7 @@
 flask
 flask-cors
 google-genai
-youtube-transcript-api
+youtube-transcript-api==0.6.4
 python-dotenv
 groq
+requests

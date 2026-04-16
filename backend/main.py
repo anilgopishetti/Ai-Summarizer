@@ -8,7 +8,15 @@ from processor import get_video_id, fetch_transcript, analyze_with_gemini, get_a
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# CORS configuration for production
+# Add your deployed frontend URLs here
+CORS(app, origins=[
+    "http://localhost:3000",  # Local development
+    "http://localhost:5173",  # Vite dev server (if using)
+    # Add your production frontend URL after deployment:
+    # "https://your-app.vercel.app",
+    # "https://*.vercel.app",  # All Vercel preview deployments
+])
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
